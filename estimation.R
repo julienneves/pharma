@@ -1,39 +1,33 @@
 library(MASS)
 library(irr)
-
-# Set parameters
-n <- 200
-b <- c(1,2,3,4)
-
-# Generate random data
-age <- rpois(n,65)
-med <- rpois(n,2)
-weight <- round(rnorm(n,mean=60,sd=10))
-sex <- rbinom(n,1,.5)
-
-# Generate random risk level according to linear model
-risk <- b[1]*age+b[2]*med+b[3]*weight+b[4]*sex+rt(n,1)
-risk <- round(4*(risk-min(risk))/(max(risk)-min(risk)))+1
+library(pROC)
+library(readxl)
+library(plyr)
+Nevi <- read_excel("C:/Users/Server/Downloads/Nevi.xlsx")
 
 # Convert risk level number to letter (A to E)
-risk <- factor(risk, ordered = TRUE)
-levels(risk) <- letters[5:1]
+Nevi$`Pertinence Clinique` <- factor(Nevi$`Pertinence Clinique`, ordered = TRUE)
+levels(Nevi$`Pertinence Clinique`) <- letters[5:1]
+
+Nevi$`Pertinence Clinique` <- revalue(Nevi$`Pertinence Clinique`, c("a"="High", "b"="High", "c"="Medium", "d"= "Low", "e"= "Low"))
 
 # Convert sex variable to factor
-sex <- factor(sex)
-levels(sex) <- c("Female", "Male")
+Nevi$sexe <- factor(Nevi$sexe)
+levels(Nevi$sexe) <- c("Female", "Male")
 
-# Create data frame and separate it into two subset
-pharma_scale <- data.frame(risk = risk , age = age, med = med, weight = weight, sex = sex)
-train <- pharma_scale[1:150,]
-test <- pharma_scale[151:200,]
+formula <- `Pertinence Clinique` ~ age + sexe + `Dossier onco` + `# Rx ` + `# Rx parenteral ` + `# Rx a Risque ` + `# Rx QT` + `Creatinemie `
+
+train <- Nevi[1:100,]
+test <- Nevi[101:135,]
 
 # Ordered logit on train data
-train.plr <- polr(risk ~ age + med + weight + sex,  method = "logistic", data = train)
+train.plr <- polr(formula,  method = "logistic", data = train, Hess = TRUE)
 summary(train.plr)
 
 # Predict model on test data
-test.pred <-ordered(predict(train.plr, test), letters[5:1])
+test.pred <- predict(train.plr, test)
 
 # Test Cohen's kappa
-kappa2(data.frame(test$risk,test.pred))
+kappa2(data.frame(test.pred, test$`Pertinence Clinique`))
+
+
